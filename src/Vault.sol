@@ -19,6 +19,7 @@ contract Vault is ERC721Holder, ReentrancyGuard, Ownable {
     error AlreadyVaulted(uint256 tokenId);
     error VaultNotFound(uint256 vaultId);
     error NotOwner();
+    error InsufficientFractions(); // <--- For redemption checks
 
     // ─────────────────────────────────────────────────────────── events ──
     event NFTDeposited(
@@ -29,6 +30,8 @@ contract Vault is ERC721Holder, ReentrancyGuard, Ownable {
         address fractionToken,
         uint256 fractionSupply
     );
+
+    event NFTRedeemed(uint256 indexed vaultId, address indexed redeemer); // To Redeem NfT for eligible users
 
     // ─────────────────────────────────────────── structs / storage ──
     struct LockedNFT {
@@ -102,6 +105,35 @@ contract Vault is ERC721Holder, ReentrancyGuard, Ownable {
             address(ft),
             fractionSupply
         );
+    }
+
+    /// @notice Allows a user holding 100% of the fractions to claim the underlying NFT.
+    /// @param vaultId The ID of the vault entry containing the target asset.
+    function redeemNFT(uint256 vaultId) external nonReentrant {
+        if (vaultId >= _nextVaultId) revert VaultNotFound(vaultId);
+        
+        LockedNFT storage vaultEntry = _vaults[vaultId];
+        if (!vaultEntry.active) revert NotVaulted(vaultEntry.tokenId);
+
+        // 1. Calculate required amount (accounting for ERC-20 decimals)
+        uint256 requiredSupply = vaultEntry.fractionSupply * (10 ** 18);
+        
+        // 2. Query user's fraction balance
+        FractionToken ft = FractionToken(vaultEntry.fractionToken);
+        if (ft.balanceOf(msg.sender) < requiredSupply) revert InsufficientFractions();
+
+        // 3. Update State *before* external calls to completely negate reentrancy attack vectors
+        vaultEntry.active = false;
+        _vaultIndex[vaultEntry.nftContract][vaultEntry.tokenId] = 0; // Free up the index for future deposits
+
+        // 4. Burn the tokens from the user's wallet
+        // CRITICAL ASSUMPTION: The FractionToken must allow the Vault (owner) to execute this burn.
+        ft.burn(msg.sender, requiredSupply);
+
+        // 5. Release physical custody of the asset
+        IERC721(vaultEntry.nftContract).safeTransferFrom(address(this), msg.sender, vaultEntry.tokenId);
+
+        emit NFTRedeemed(vaultId, msg.sender);
     }
 
     // ──────────────────────────────────────────────────── view helpers ──
