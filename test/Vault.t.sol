@@ -106,6 +106,98 @@ contract VaultTest is Test {
         vm.expectRevert(abi.encodeWithSelector(Vault.VaultNotFound.selector, 7));
         vault.getLockedNFT(7);
     }
+    // ── redemption tests ──
+
+    function test_redeemNFT_happyPath_unlocksAssetCorrectly() public {
+        uint256 tokenId = 42;
+        uint256 fractionSupply = 500;
+
+        // 1. Initial Deposit by User
+        nft.mint(user, tokenId);
+        vm.startPrank(user);
+        nft.approve(address(vault), tokenId);
+        uint256 vaultId = vault.deposit(address(nft), tokenId, fractionSupply, "Redeem Token", "RDM");
+        vm.stopPrank();
+
+        Vault.LockedNFT memory entry = vault.getLockedNFT(vaultId);
+        FractionToken fractionToken = FractionToken(entry.fractionToken);
+
+        // 2. Simulating full buyout (User transfers 100% supply to Buyer)
+        uint256 totalFractionsRaw = fractionSupply * 1e18;
+        vm.prank(user);
+        fractionToken.transfer(user, totalFractionsRaw);
+
+        // Verifying buyer holds 100% of supply before redemption
+        assertEq(fractionToken.balanceOf(user), totalFractionsRaw);
+        assertEq(nft.ownerOf(tokenId), address(vault));
+
+        // 3. Buyer triggers redemption
+        vm.prank(user);
+        vault.redeemNFT(vaultId);
+
+        // 4. Assertions
+        assertEq(nft.ownerOf(tokenId), user); // Buyer now owns the physical NFT
+        assertEq(fractionToken.totalSupply(), 0); // Supply burned entirely
+        assertFalse(vault.isVaulted(address(nft), tokenId)); // Vault reflects status cleanly
+        
+        // Ensure struct flag is marked inactive
+        Vault.LockedNFT memory updatedEntry = vault.getLockedNFT(vaultId);
+        assertFalse(updatedEntry.active);
+    }
+
+    function test_redeemNFT_revertsOnInsufficientFractions() public {
+        uint256 tokenId = 100;
+        uint256 fractionSupply = 1000;
+
+        nft.mint(user, tokenId);
+        vm.startPrank(user);
+        nft.approve(address(vault), tokenId);
+        uint256 vaultId = vault.deposit(address(nft), tokenId, fractionSupply, "Fail Token", "FAIL");
+        vm.stopPrank();
+
+        Vault.LockedNFT memory entry = vault.getLockedNFT(vaultId);
+        FractionToken fractionToken = FractionToken(entry.fractionToken);
+
+        // User transfers almost everything away, but holds back 1 token base unit (1 wei of ERC20)
+        uint256 totalFractionsRaw = fractionSupply * 1e18;
+        vm.prank(user);
+        fractionToken.transfer(address(this), totalFractionsRaw - 1);
+
+        // Redeemer tries to redeem with 99.9999...% supply
+        vm.prank(user);
+        vm.expectRevert(Vault.InsufficientFractions.selector);
+        vault.redeemNFT(vaultId);
+    }
+
+    function test_redeemNFT_revertsOnInvalidVaultId() public {
+        // Vault 99 doesn't exist
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(Vault.VaultNotFound.selector, 99));
+        vault.redeemNFT(99);
+    }
+
+    function test_redeemNFT_revertsIfVaultAlreadyInactive() public {
+        uint256 tokenId = 7;
+        uint256 fractionSupply = 100;
+
+        nft.mint(user, tokenId);
+        vm.startPrank(user);
+        nft.approve(address(vault), tokenId);
+        uint256 vaultId = vault.deposit(address(nft), tokenId, fractionSupply, "Double Redeem", "DR");
+        vm.stopPrank();
+
+        Vault.LockedNFT memory entry = vault.getLockedNFT(vaultId);
+        FractionToken fractionToken = FractionToken(entry.fractionToken);
+
+        // Redeem once cleanly
+        vm.prank(user);
+        vault.redeemNFT(vaultId);
+
+        // Attempting to redeem the same vault ID a second time should fail
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(Vault.NotVaulted.selector, tokenId));
+        vault.redeemNFT(vaultId);
+    }
 }
 
 

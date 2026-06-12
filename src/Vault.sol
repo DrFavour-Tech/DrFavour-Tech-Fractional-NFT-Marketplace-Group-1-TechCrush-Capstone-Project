@@ -3,6 +3,7 @@ pragma solidity ^0.8.33;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./FractionToken.sol";
@@ -12,13 +13,14 @@ import "./FractionToken.sol";
 ///         and mints the requested fractional supply to the depositor.
 ///         Each vault entry is identified by a monotonically incrementing vaultId.
 contract Vault is ERC721Holder, ReentrancyGuard, Ownable {
-    // ─────────────────────────────────────────────────────────── errors ──
+    // error
     error ZeroAddress();
     error ZeroSupply();
     error NotVaulted(uint256 tokenId);
     error AlreadyVaulted(uint256 tokenId);
     error VaultNotFound(uint256 vaultId);
     error NotOwner();
+    error InsufficientFractions(); // <--- For redemption checks
 
     // ─────────────────────────────────────────────────────────── events ──
     event NFTDeposited(
@@ -29,6 +31,8 @@ contract Vault is ERC721Holder, ReentrancyGuard, Ownable {
         address fractionToken,
         uint256 fractionSupply
     );
+
+    event NFTRedeemed(uint256 indexed vaultId, address indexed redeemer); // To Redeem NfT for eligible users
 
     // ─────────────────────────────────────────── structs / storage ──
     struct LockedNFT {
@@ -96,6 +100,31 @@ contract Vault is ERC721Holder, ReentrancyGuard, Ownable {
             address(ft),
             fractionSupply
         );
+    }
+
+    /// @notice Redeem the locked NFT by burning the full fraction supply.
+    function redeemNFT(uint256 vaultId) external nonReentrant {
+        if (vaultId >= _nextVaultId) revert VaultNotFound(vaultId);
+
+        LockedNFT storage entry = _vaults[vaultId];
+        if (!entry.active) revert NotVaulted(entry.tokenId);
+
+        uint256 required = entry.fractionSupply * (10 ** 18);
+
+        if (IERC20(entry.fractionToken).balanceOf(msg.sender) < required) {
+            revert InsufficientFractions();
+        }
+
+        // Burn fractions from redeemer (Vault is FractionToken owner)
+        FractionToken(entry.fractionToken).burn(msg.sender, required);
+
+        // Transfer NFT out
+        IERC721(entry.nftContract).safeTransferFrom(address(this), msg.sender, entry.tokenId);
+
+        // Mark inactive (so isVaulted(...) becomes false)
+        entry.active = false;
+
+        emit NFTRedeemed(vaultId, msg.sender);
     }
 
 
