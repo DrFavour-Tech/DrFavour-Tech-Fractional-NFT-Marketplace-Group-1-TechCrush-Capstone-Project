@@ -8,30 +8,24 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 /// @notice ERC-20 token representing fractional ownership stakes in a vaulted NFT.
 ///         Only the Vault contract (owner) may mint or burn tokens.
 contract FractionToken is ERC20, Ownable {
-    // ─────────────────────────────────────────────────────────── errors ──
+    // errors
     error ZeroAmount();
     error ZeroAddress();
 
-    // ───────────────────────────────────────────────────────── metadata ──
-    /// @notice Human-readable name of the underlying vaulted asset.
+    // storage  
     string public assetName;
-
-    // ──────────────────────────────────────────────────────── constructor ──
-    /// @param name_       ERC-20 name  (e.g. "Fraction: Bored Ape #1234")
-    /// @param symbol_     ERC-20 symbol (e.g. "fBAYC1234")
-    /// @param assetName_  Plain-English label stored on-chain for UI use
-    /// @param vault_      Address of the Vault that will own this contract
+  
     constructor(
-        string memory name_,
-        string memory symbol_,
-        string memory assetName_,
-        address vault_
+        string memory name_, // ERC-20 name  (e.g. "Fraction: Bored Ape #1234")
+        string memory symbol_, // ERC-20 symbol (e.g. "FRACT-BAYC1234")
+        string memory assetName_, // Plain-English label stored on-chain for UI use
+        address vault_ // Address of the Vault that will own this contract
     ) ERC20(name_, symbol_) Ownable(vault_) {
         if (vault_ == address(0)) revert ZeroAddress();
         assetName = assetName_;
     }
 
-    // ──────────────────────────────────────────────────── vault interface ──
+    // vault-only token management
     /// @notice Mint `amount` tokens to `to`. Callable only by the Vault.
     function mint(address to, uint256 amount) external onlyOwner {
         if (to == address(0)) revert ZeroAddress();

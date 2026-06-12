@@ -25,7 +25,7 @@ contract Marketplace is ReentrancyGuard, Ownable, Pausable {
     error FeeTooHigh(uint256 maxBps, uint256 provided);
     error ETHTransferFailed();
 
-    // ─────────────────────────────────────────────────────────── events ──
+    // events
     event Listed(
         uint256 indexed listingId,
         address indexed seller,
@@ -69,15 +69,11 @@ contract Marketplace is ReentrancyGuard, Ownable, Pausable {
         platformFeeBps = initialFeeBps;
     }
 
-    /// @notice Escrow `amount` of `tokenAddress` for sale at `pricePerToken` ETH.
-    /// @param tokenAddress  FractionToken contract address.
-    /// @param amount        Token amount to list (in wei, 18 decimals).
-    /// @param pricePerToken ETH price per 1e18 token units (i.e. per "whole" token).
-    /// @return listingId    Assigned listing identifier.
+    // Escrow `amount` of `tokenAddress` for sale at `pricePerToken` ETH.
     function listFraction(
-        address tokenAddress,
-        uint256 amount,
-        uint256 pricePerToken
+        address tokenAddress, // FractionToken contract address.
+        uint256 amount, // Token amount to list (in wei, 18 decimals).
+        uint256 pricePerToken // ETH price per 1e18 token units (i.e. per "whole" token).
     ) external whenNotPaused returns (uint256 listingId) {
         if (tokenAddress == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
@@ -109,7 +105,7 @@ contract Marketplace is ReentrancyGuard, Ownable, Pausable {
         Listing storage listing = _listings[listingId];
         if (!listing.active) revert ListingNotActive(listingId);
 
-        // ── price calculation ──────────────────────────────────────────
+        // price calculations 
         // totalPrice  = amount × pricePerToken / 1e18
         // platformFee = (totalPrice × platformFeeBps) / 10_000
         uint256 totalPrice = (listing.amount * listing.pricePerToken) / 1e18;
@@ -143,7 +139,7 @@ contract Marketplace is ReentrancyGuard, Ownable, Pausable {
         emit ListingCancelled(listingId);
     }
 
-    // ─────────────────────────────────────────────── admin functions ──
+    // admin functions
 
     /// @notice Update the platform fee. Hard-capped at MAX_FEE_BPS (10 %).
     function updatePlatformFee(uint256 newFee) external onlyOwner {
@@ -172,7 +168,7 @@ contract Marketplace is ReentrancyGuard, Ownable, Pausable {
         _unpause();
     }
 
-    // ──────────────────────────────────────────────────── view helpers ──
+    // views    
 
     /// @notice Returns full listing data.
     function getListing(uint256 listingId)

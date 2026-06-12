@@ -22,7 +22,7 @@ contract Vault is ERC721Holder, ReentrancyGuard, Ownable {
 
     // ─────────────────────────────────────────────────────────── events ──
     event NFTDeposited(
-        uint256 indexed vaultId,
+        uint256 indexed vaultId, 
         address indexed depositor,
         address indexed nftContract,
         uint256 tokenId,
@@ -53,20 +53,14 @@ contract Vault is ERC721Holder, ReentrancyGuard, Ownable {
         if (owner_ == address(0)) revert ZeroAddress();
     }
 
-    // ────────────────────────────────────────────────────── core logic ──
-    /// @notice Lock an NFT and receive freshly-minted fractional ERC-20 tokens.
-    /// @param nftContract    Address of the ERC-721 contract.
-    /// @param tokenId        Token ID to deposit.
-    /// @param fractionSupply Total fractional tokens to mint (no decimals — treated as whole units × 10^18 by ERC-20).
-    /// @param name_          Name for the new FractionToken.
-    /// @param symbol_        Symbol for the new FractionToken.
-    /// @return vaultId       Identifier for this vault entry.
+    // core logic
+    // Lock an NFT and receive freshly-minted fractional ERC-20 tokens.
     function deposit(
-        address nftContract,
-        uint256 tokenId,
-        uint256 fractionSupply,
-        string calldata name_,
-        string calldata symbol_
+        address nftContract, // Address of the ERC-721 contract
+        uint256 tokenId, // Token ID of the NFT to lock
+        uint256 fractionSupply, //  Total fractional tokens to mint in whole units (not in wei)
+        string calldata name_, // Name for the new FractionToken.
+        string calldata symbol_ // Symbol for the new FractionToken.
     ) external nonReentrant returns (uint256 vaultId) {
         if (nftContract == address(0)) revert ZeroAddress();
         if (fractionSupply == 0) revert ZeroSupply();
@@ -80,7 +74,7 @@ contract Vault is ERC721Holder, ReentrancyGuard, Ownable {
         FractionToken ft = new FractionToken(name_, symbol_, name_, address(this));
 
         // Register the vault entry
-        vaultId = _nextVaultId++;
+        vaultId = _nextVaultId++; // 
         _vaults[vaultId] = LockedNFT({
             nftContract: nftContract,
             tokenId: tokenId,
@@ -104,8 +98,9 @@ contract Vault is ERC721Holder, ReentrancyGuard, Ownable {
         );
     }
 
-    // ──────────────────────────────────────────────────── view helpers ──
-    /// @notice Returns full metadata for a vault entry.
+
+    // views
+     /// @notice Get vault entry by `vaultId`.
     function getLockedNFT(uint256 vaultId)
         external
         view
