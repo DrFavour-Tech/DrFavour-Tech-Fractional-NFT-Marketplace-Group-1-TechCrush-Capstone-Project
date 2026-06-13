@@ -2,42 +2,47 @@
 pragma solidity ^0.8.33;
 
 import "forge-std/Script.sol";
+import "forge-std/console2.sol";
 
-import "../src/Vault.sol";
-import "../src/Marketplace.sol";
+import {Vault} from "../src/Vault.sol";
+import {Marketplace} from "../src/Marketplace.sol";
 
-/**
- * @notice Deployment script for Vault + Marketplace.
- *
- * Environment variables (recommended):
- * - DEPLOYER_PRIVATE_KEY
- * - VAULT_OWNER
- * - MARKETPLACE_OWNER
- * - MARKETPLACE_INITIAL_FEE_BPS
- *
- * Example:
- * forge script script/DeployContracts.s.sol:DeployContracts \
- *   --rpc-url <your_rpc_url> --broadcast \
- *   --private-key $DEPLOYER_PRIVATE_KEY
- *
- * Note: This repo’s instruction says not to execute scripts here; this file is provided for deployment readiness.
- */
+/// @notice Deploys Vault + Marketplace.
+/// @dev    Broadcast with:
+///         forge script script/DeployContracts.s.sol:DeployContracts \
+///           --rpc-url <RPC_URL> --broadcast --private-key $DEPLOYER_PRIVATE_KEY
+///
+///         Optional env vars:
+///           VAULT_OWNER
+///           MARKETPLACE_OWNER
+///           MARKETPLACE_INITIAL_FEE_BPS
 contract DeployContracts is Script {
     function run() external {
-        uint256 deployerPk = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        address vaultOwner = vm.envAddress("VAULT_OWNER");
-        address marketplaceOwner = vm.envAddress("MARKETPLACE_OWNER");
-        uint256 initialFeeBps = vm.envUint("MARKETPLACE_INITIAL_FEE_BPS");
+        address deployer = vm.addr(vm.envUint("DEPLOYER_PRIVATE_KEY"));
+        console2.log("Deployer:", deployer);
 
-        vm.startBroadcast(deployerPk);
+        address vaultOwner = vm.envOr("VAULT_OWNER", deployer);
+        address marketplaceOwner = vm.envOr("MARKETPLACE_OWNER", deployer);
+        uint256 feeBps = vm.envOr("MARKETPLACE_INITIAL_FEE_BPS", uint256(250)); // 2.5%
 
+        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
+
+        vm.startBroadcast(deployerPrivateKey);
+
+        // Deploy Vault
         Vault vault = new Vault(vaultOwner);
+        console2.log("Vault:", address(vault));
 
-        Marketplace marketplace = new Marketplace(marketplaceOwner, initialFeeBps);
+        // Deploy Marketplace
+        Marketplace marketplace = new Marketplace(marketplaceOwner, feeBps);
+        console2.log("Marketplace:", address(marketplace));
 
         vm.stopBroadcast();
 
-        // Silence unused vars warnings if any tooling complains
-        (vault, marketplace);
+        // Final sanity logs
+        console2.log("vault.owner():", vault.owner());
+        console2.log("marketplace.owner():", marketplace.owner());
+        console2.log("marketplace.platformFeeBps():", marketplace.platformFeeBps());
     }
 }
+
