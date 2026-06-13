@@ -22,7 +22,7 @@ contract Vault is ERC721Holder, ReentrancyGuard, Ownable {
     error NotOwner();
     error InsufficientFractions(); // <--- For redemption checks
 
-    // ─────────────────────────────────────────────────────────── events ──
+    // event
     event NFTDeposited(
         uint256 indexed vaultId, 
         address indexed depositor,
@@ -34,7 +34,7 @@ contract Vault is ERC721Holder, ReentrancyGuard, Ownable {
 
     event NFTRedeemed(uint256 indexed vaultId, address indexed redeemer); // To Redeem NfT for eligible users
 
-    // ─────────────────────────────────────────── structs / storage ──
+    // structs and storage
     struct LockedNFT {
         address nftContract;
         uint256 tokenId;
@@ -52,7 +52,7 @@ contract Vault is ERC721Holder, ReentrancyGuard, Ownable {
     /// nftContract → tokenId → vaultId+1  (0 means not vaulted)
     mapping(address => mapping(uint256 => uint256)) private _vaultIndex;
 
-    // ──────────────────────────────────────────────────────── constructor ──
+    // constructor
     constructor(address owner_) Ownable(owner_) {
         if (owner_ == address(0)) revert ZeroAddress();
     }
